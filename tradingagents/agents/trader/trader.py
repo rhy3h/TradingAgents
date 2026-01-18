@@ -1,6 +1,7 @@
 import functools
 import time
 import json
+from tradingagents.agents.utils.prompt_loader import get_prompt_loader
 
 
 def create_trader(llm, memory):
@@ -22,17 +23,31 @@ def create_trader(llm, memory):
         else:
             past_memory_str = "No past memories found."
 
-        context = {
-            "role": "user",
-            "content": f"Based on a comprehensive analysis by a team of analysts, here is an investment plan tailored for {company_name}. This plan incorporates insights from current technical market trends, macroeconomic indicators, and social media sentiment. Use this plan as a foundation for evaluating your next trading decision.\n\nProposed Investment Plan: {investment_plan}\n\nLeverage these insights to make an informed and strategic decision.",
-        }
+        loader = get_prompt_loader()
+
+        system_message = loader.get_formatted_prompt(
+            "trader", 
+            "trader", 
+            key="system_message", 
+            past_memory_str=past_memory_str
+        )
+        context_content = loader.get_formatted_prompt(
+            "trader", 
+            "trader", 
+            key="context_template", 
+            company_name=company_name, 
+            investment_plan=investment_plan
+        )
 
         messages = [
             {
                 "role": "system",
-                "content": f"""You are a trading agent analyzing market data to make investment decisions. Based on your analysis, provide a specific recommendation to buy, sell, or hold. End with a firm decision and always conclude your response with 'FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL**' to confirm your recommendation. Do not forget to utilize lessons from past decisions to learn from your mistakes. Here is some reflections from similar situatiosn you traded in and the lessons learned: {past_memory_str}""",
+                "content": system_message,
             },
-            context,
+            {
+                "role": "user",
+                "content": context_content,
+            },
         ]
 
         result = llm.invoke(messages)
